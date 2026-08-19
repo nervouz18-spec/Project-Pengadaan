@@ -80,14 +80,20 @@ export interface UserProfile {
 }
 
 // Interfaces for Laporan Keuangan & Pembagian Hasil
+export interface CapitalItemAllocation {
+  itemId: string;
+  percentage: number; // 0-100, persentase modal yang dialokasikan ke anggota ini
+}
+
 export interface ProfitShareMember {
   id: string;
   name: string;
   role?: string;
   percentage: number; // % dari Laba Bersih Akhir
   notes?: string;
-  capitalItemIds?: string[]; // id barang dari proyek yang dikontribusikan sebagai modal
-  capitalNominal?: number; // total (harga beli × qty) dari capitalItemIds
+  capitalItemIds?: string[]; // DEPRECATED - backward compat untuk laporan lama (100% per item)
+  capitalNominal?: number; // manual override / fallback
+  capitalItems?: CapitalItemAllocation[]; // NEW: alokasi modal per item dengan persentase
 }
 
 export interface OperationalExpenseItem {

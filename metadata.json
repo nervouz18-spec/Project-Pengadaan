@@ -1,7 +1,0 @@
-{
-  "name": "Proyeksi Laba",
-  "description": "Kalkulator dan Pusat Navigasi Keuangan Proyeksi Laba & Penjualan",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
-

@@ -227,14 +227,16 @@ export const SavedReportsArchiveView: React.FC<SavedReportsArchiveViewProps> = (
     const labaProject = Math.max(0, uangMasuk - totalModal - cashbackNominal - komisiNominal);
     const biayaMaterai = Math.max(0, Number(editDraft.biayaMaterai) || 0);
     const biayaOperasional = Math.max(0, Number(editDraft.biayaOperasional) || 0);
+    const labaSetelahBiaya = Math.max(0, labaProject - biayaMaterai - biayaOperasional);
     const tabunganPajakPercent = Math.min(100, Math.max(0, Number(editDraft.tabunganPajakPercent) || 0));
-    const tabunganPajakNominal = Math.round(labaProject * (tabunganPajakPercent / 100));
-    const labaBersihAkhir = Math.max(0, labaProject - biayaMaterai - biayaOperasional - tabunganPajakNominal);
+    const tabunganPajakNominal = Math.round(labaSetelahBiaya * (tabunganPajakPercent / 100));
+    const labaBersihAkhir = Math.max(0, labaSetelahBiaya - tabunganPajakNominal);
     const totalPercent = editDraft.members.reduce((s, m) => s + (Number(m.percentage) || 0), 0);
     return {
       cashbackNominal,
       komisiNominal,
       labaProject,
+      labaSetelahBiaya,
       tabunganPajakNominal,
       labaBersihAkhir,
       totalPercent: Number(totalPercent.toFixed(2)),
@@ -256,6 +258,7 @@ export const SavedReportsArchiveView: React.FC<SavedReportsArchiveViewProps> = (
       percentage: Number(m.percentage) || 0,
       capitalNominal: Math.max(0, Number(m.capitalNominal) || 0),
       capitalItemIds: m.capitalItemIds,
+      capitalItems: m.capitalItems,
     }));
     const updated: SavedFinancialReport = {
       ...editDraft,
@@ -1596,7 +1599,12 @@ export const SavedReportsArchiveView: React.FC<SavedReportsArchiveViewProps> = (
                               className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-medium text-slate-700 text-right focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-300"
                             />
                           </div>
-                          {(m.capitalItemIds && m.capitalItemIds.length > 0) && (
+                          {(m.capitalItems && m.capitalItems.length > 0) && (
+                            <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-1.5 py-0.5">
+                              Berasal dari {m.capitalItems.length} item (split persenan)
+                            </span>
+                          )}
+                          {(!m.capitalItems || m.capitalItems.length === 0) && (m.capitalItemIds && m.capitalItemIds.length > 0) && (
                             <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-1.5 py-0.5">
                               Berasal dari {m.capitalItemIds.length} item terpilih
                             </span>

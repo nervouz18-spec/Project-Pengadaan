@@ -5,7 +5,8 @@ import {
   ProjectMeta, 
   ProfitShareMember, 
   OperationalExpenseItem, 
-  SavedFinancialReport 
+  SavedFinancialReport,
+  CapitalItemAllocation 
 } from '../types';
 import { formatRupiah, parseNumberFromInput, computeItemMetrics } from '../utils/formatters';
 import { 
@@ -76,7 +77,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
   const [biayaOperasionalStr, setBiayaOperasionalStr] = useState<string>('50.000');
   const [reportNotes, setReportNotes] = useState<string>('');
 
-  // Tabungan Pajak (0-10% dari Laba Kalkulator atau nominal manual)
+  // Tabungan Pajak (0-10% dari Laba Proyek atau nominal manual)
   const [tabunganPajakPercent, setTabunganPajakPercent] = useState<number>(0);
   const [tabunganPajakManualNominalStr, setTabunganPajakManualNominalStr] = useState<string>('');
   const [tabunganPajakMode, setTabunganPajakMode] = useState<'percent' | 'manual'>('percent');
@@ -96,6 +97,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
 
   // Id anggota yang sedang memilih item modal (modal picker)
   const [capitalPickerMemberId, setCapitalPickerMemberId] = useState<string | null>(null);
+  const [capitalPickerMode, setCapitalPickerMode] = useState<'persenan' | 'manual'>('persenan');
 
   // Internal Saved Financial Reports state fallback
   const [internalSavedReports, setInternalSavedReports] = useState<SavedFinancialReport[]>(() => {
@@ -298,39 +300,88 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
     ? totalItemizedOps
     : parseNumberFromInput(biayaOperasionalStr);
 
-  // Tabungan Pajak computation (dari laba proyek atau nominal manual)
+  // Laba Setelah Biaya = Laba Proyek - Materai - Operasional
+  // Tabungan pajak diambil dari laba setelah biaya, bukan dari laba proyek
+  const labaSetelahBiaya = Math.max(0, labaProject - biayaMateraiNum - biayaOperasionalNum);
+
+  // Tabungan Pajak computation (dari laba setelah biaya materai & operasional, atau nominal manual)
   const tabunganPajakNum = useMemo(() => {
     if (tabunganPajakMode === 'percent') {
-      return Math.round((labaProject * (tabunganPajakPercent / 100)));
+      return Math.round((labaSetelahBiaya * (tabunganPajakPercent / 100)));
     }
     return parseNumberFromInput(tabunganPajakManualNominalStr);
-  }, [tabunganPajakMode, tabunganPajakPercent, tabunganPajakManualNominalStr, labaProject]);
+  }, [tabunganPajakMode, tabunganPajakPercent, tabunganPajakManualNominalStr, labaSetelahBiaya]);
 
   const effectiveTabunganPajakPercent = useMemo(() => {
     if (tabunganPajakMode === 'percent') return tabunganPajakPercent;
-    if (labaProject > 0) {
-      return Number(((tabunganPajakNum / labaProject) * 100).toFixed(1));
+    if (labaSetelahBiaya > 0) {
+      return Number(((tabunganPajakNum / labaSetelahBiaya) * 100).toFixed(1));
     }
     return 0;
-  }, [tabunganPajakMode, tabunganPajakPercent, tabunganPajakNum, labaProject]);
+  }, [tabunganPajakMode, tabunganPajakPercent, tabunganPajakNum, labaSetelahBiaya]);
 
-  // Laba Bersih Akhir = Laba Project - Biaya Materai - Biaya Operasional - Tabungan Pajak
+  // Laba Bersih Akhir = Laba Setelah Biaya - Tabungan Pajak
   const labaBersihAkhir = Math.max(
     0, 
-    labaProject - biayaMateraiNum - biayaOperasionalNum - tabunganPajakNum
+    labaSetelahBiaya - tabunganPajakNum
   );
 
   // ===== Pembagian Modal (Kontribusi Item per Anggota) =====
   const sourceItems = currentProjectData.items;
 
-  // Hitung modal anggota = total (harga beli × qty) dari item terpilih
+  // Total alokasi persentase per item di seluruh anggota
+  const itemAllocations: Record<string, number> = useMemo(() => {
+    const alloc: Record<string, number> = {};
+    sourceItems.forEach((item) => { alloc[item.id] = 0; });
+    members.forEach((m) => {
+      const items = m.capitalItems || [];
+      items.forEach((ci) => {
+        if (alloc[ci.itemId] !== undefined) {
+          alloc[ci.itemId] += ci.percentage;
+        }
+      });
+    });
+    return alloc;
+  }, [members, sourceItems]);
+
+  // Total modal yang diinput manual (bukan lewat item picker)
+  const totalManualCapital = useMemo(() => {
+    return members.reduce((sum, m) => {
+      if (m.capitalItems && m.capitalItems.length > 0) return sum;
+      return sum + (m.capitalNominal || 0);
+    }, 0);
+  }, [members]);
+
+  // Modal belum teralokasi per item, dikurangi kontribusi manual anggota
+  const totalUnallocatedModal = useMemo(() => {
+    const unallocFromItems = sourceItems.reduce((sum, item) => {
+      const totalPercent = itemAllocations[item.id] || 0;
+      const unallocPercent = Math.max(0, 100 - Math.min(totalPercent, 100));
+      return sum + ((item.buyPrice || 0) * (item.qty || 1) * (unallocPercent / 100));
+    }, 0);
+    return Math.max(0, unallocFromItems - totalManualCapital);
+  }, [sourceItems, itemAllocations, totalManualCapital]);
+
+  // Hitung modal anggota = total (harga beli × qty × persentase) dari item terpilih
   const computeMemberCapital = (member: ProfitShareMember): number => {
+    // New: capitalItems dengan persentase per item
+    if (member.capitalItems && member.capitalItems.length > 0) {
+      return member.capitalItems
+        .filter((ci) => ci.percentage > 0)
+        .reduce((sum, ci) => {
+          const item = sourceItems.find((i) => i.id === ci.itemId);
+          if (!item) return sum;
+          return sum + ((item.buyPrice || 0) * (item.qty || 1) * (ci.percentage / 100));
+        }, 0);
+    }
+    // Fallback: capitalItemIds (100% per item)
     const ids = member.capitalItemIds || [];
-    if (ids.length === 0) return 0;
+    if (ids.length === 0) {
+      return member.capitalNominal || 0;
+    }
     const total = sourceItems
       .filter((item) => ids.includes(item.id))
-      .reduce((sum, item) => sum + (item.buyPrice || 0) * (item.qty || 0), 0);
-    // Fallback ke nilai tersimpan bila item dari proyek lama tidak ditemukan di sumber saat ini
+      .reduce((sum, item) => sum + (item.buyPrice || 0) * (item.qty || 1), 0);
     if (total === 0 && (member.capitalNominal || 0) > 0) {
       return member.capitalNominal || 0;
     }
@@ -352,7 +403,9 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, sourceItems]);
 
-  const unallocatedModal = Math.max(0, currentProjectData.totalModal - totalAllocatedCapital);
+  const hasOverAllocation = useMemo(() => {
+    return Object.values(itemAllocations).some((pct) => pct > 100);
+  }, [itemAllocations]);
 
   // Profit sharing calculations
   const totalPercentageAllocated = useMemo(() => {
@@ -369,7 +422,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
       name: '',
       role: 'Anggota Tim',
       percentage: remainingPercentage > 0 ? remainingPercentage : 0,
-      capitalItemIds: [],
+      capitalItems: [],
     };
     setMembers((prev) => [...prev, newMem]);
   };
@@ -399,12 +452,12 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
     setMembers((prev) =>
       prev.map((m) => {
         if (m.id !== memberId) return m;
-        const ids = m.capitalItemIds || [];
-        const has = ids.includes(itemId);
-        return {
-          ...m,
-          capitalItemIds: has ? ids.filter((id) => id !== itemId) : [...ids, itemId],
-        };
+        const items = m.capitalItems || [];
+        const exists = items.find((ci) => ci.itemId === itemId);
+        if (exists) {
+          return { ...m, capitalItems: items.filter((ci) => ci.itemId !== itemId) };
+        }
+        return { ...m, capitalItems: [...items, { itemId, percentage: 100 }] };
       })
     );
   };
@@ -415,10 +468,65 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
         if (m.id !== memberId) return m;
         return {
           ...m,
-          capitalItemIds: selectAll ? sourceItems.map((i) => i.id) : [],
+          capitalItems: selectAll
+            ? sourceItems.map((i) => ({ itemId: i.id, percentage: 100 }))
+            : [],
         };
       })
     );
+  };
+
+  const handleUpdateCapitalItemPercent = (memberId: string, itemId: string, percentage: number) => {
+    const clamped = Math.min(100, Math.max(0, percentage || 0));
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.id !== memberId) return m;
+        const items = (m.capitalItems || []).map((ci) =>
+          ci.itemId === itemId ? { ...ci, percentage: clamped } : ci
+        );
+        // Remove item if percentage is 0
+        return { ...m, capitalItems: items.filter((ci) => ci.percentage > 0) };
+      })
+    );
+  };
+
+  const handleSetCapitalManualNominal = (memberId: string, nominal: number) => {
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.id !== memberId) return m;
+        return { ...m, capitalNominal: Math.max(0, nominal), capitalItems: [] };
+      })
+    );
+  };
+
+  const handleSwitchCapitalMode = (memberId: string, newMode: 'persenan' | 'manual') => {
+    setCapitalPickerMode(newMode);
+    if (newMode === 'manual') {
+      setMembers((prev) =>
+        prev.map((m) => {
+          if (m.id !== memberId) return m;
+          const currentCapital = (() => {
+            const items = m.capitalItems || [];
+            if (items.length > 0) {
+              return items.filter((ci) => ci.percentage > 0).reduce((sum, ci) => {
+                const src = sourceItems.find((s) => s.id === ci.itemId);
+                if (!src) return sum;
+                return sum + (src.buyPrice || 0) * (src.qty || 1) * (ci.percentage / 100);
+              }, 0);
+            }
+            return 0;
+          })();
+          return { ...m, capitalNominal: currentCapital, capitalItems: [] };
+        })
+      );
+    } else {
+      setMembers((prev) =>
+        prev.map((m) => {
+          if (m.id !== memberId) return m;
+          return { ...m, capitalNominal: 0, capitalItems: m.capitalItems && m.capitalItems.length > 0 ? m.capitalItems : [] };
+        })
+      );
+    }
   };
 
   const capitalPickerMember = capitalPickerMemberId
@@ -437,27 +545,27 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
       triggerToast(`Pembagian dibagi rata (${members.length} orang)!`);
     } else if (presetType === '50-50') {
       setMembers([
-        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Penerima A', role: 'Partner 1', percentage: 50, capitalItemIds: [] },
-        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Penerima B', role: 'Partner 2', percentage: 50, capitalItemIds: [] },
+        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Penerima A', role: 'Partner 1', percentage: 50, capitalItems: [] },
+        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Penerima B', role: 'Partner 2', percentage: 50, capitalItems: [] },
       ]);
       triggerToast('Preset 50% : 50% diterapkan!');
     } else if (presetType === '60-40') {
       setMembers([
-        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Founder / PJ', role: 'Ketua Pelaksana', percentage: 60, capitalItemIds: [] },
-        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Partner / Tim', role: 'Partner', percentage: 40, capitalItemIds: [] },
+        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Founder / PJ', role: 'Ketua Pelaksana', percentage: 60, capitalItems: [] },
+        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Partner / Tim', role: 'Partner', percentage: 40, capitalItems: [] },
       ]);
       triggerToast('Preset 60% : 40% diterapkan!');
     } else if (presetType === '70-30') {
       setMembers([
-        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Pemodal / Founder', role: 'Investor / Lead', percentage: 70, capitalItemIds: [] },
-        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Pelaksana', role: 'Operasional', percentage: 30, capitalItemIds: [] },
+        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Pemodal / Founder', role: 'Investor / Lead', percentage: 70, capitalItems: [] },
+        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Pelaksana', role: 'Operasional', percentage: 30, capitalItems: [] },
       ]);
       triggerToast('Preset 70% : 30% diterapkan!');
     } else if (presetType === '40-30-30') {
       setMembers([
-        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Penerima 1', role: 'Lead', percentage: 40, capitalItemIds: [] },
-        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Penerima 2', role: 'Marketing', percentage: 30, capitalItemIds: [] },
-        { id: `mem-${Date.now()}-3`, name: members[2]?.name || 'Penerima 3', role: 'Operasional', percentage: 30, capitalItemIds: [] },
+        { id: `mem-${Date.now()}-1`, name: members[0]?.name || 'Penerima 1', role: 'Lead', percentage: 40, capitalItems: [] },
+        { id: `mem-${Date.now()}-2`, name: members[1]?.name || 'Penerima 2', role: 'Marketing', percentage: 30, capitalItems: [] },
+        { id: `mem-${Date.now()}-3`, name: members[2]?.name || 'Penerima 3', role: 'Operasional', percentage: 30, capitalItems: [] },
       ]);
       triggerToast('Preset 40% : 30% : 30% diterapkan!');
     }
@@ -527,6 +635,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
         ...m,
         capitalNominal: computeMemberCapital(m),
         capitalItemIds: m.capitalItemIds || [],
+        capitalItems: m.capitalItems || [],
       })),
       customNotes: reportNotes.trim(),
     };
@@ -1252,7 +1361,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                     ))}
                   </div>
                   <p className="text-[10px] text-slate-500 leading-tight">
-                    * Dihitung dari Laba Kalkulator (Rp {formatRupiah(currentProjectData.labaProject)}).
+                    * Dihitung dari Laba Setelah Biaya Operasional (Rp {formatRupiah(labaSetelahBiaya)}).
                   </p>
                 </div>
               ) : (
@@ -1275,7 +1384,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                   <div className="text-[10px] text-slate-500 flex items-center justify-between">
                     <span>Setara persentase:</span>
                     <strong className="text-amber-800 font-bold">
-                      {effectiveTabunganPajakPercent}% dari Laba Kalkulator
+                      {effectiveTabunganPajakPercent}% dari Laba Setelah Biaya
                     </strong>
                   </div>
                 </div>
@@ -1419,12 +1528,22 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                 </span>
               </div>
 
+              {/* Subtotal Laba Setelah Biaya */}
+              <div className="flex items-center justify-between p-2.5 bg-slate-100/90 rounded-xl font-bold">
+                <span className="text-slate-800">
+                  = Laba Setelah Biaya Materai & Operasional:
+                </span>
+                <span className="font-black text-slate-900 text-sm">
+                  Rp {formatRupiah(labaSetelahBiaya)}
+                </span>
+              </div>
+
               {/* 7. Tabungan Pajak */}
               {tabunganPajakNum > 0 && (
                 <div className="flex items-center justify-between p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/70">
                   <div>
                     <span className="font-bold text-amber-950 block">
-                      7. Dikurangi: Tabungan Pajak ({effectiveTabunganPajakPercent}% dari Laba)
+                      7. Dikurangi: Tabungan Pajak ({effectiveTabunganPajakPercent}% dari Laba Setelah Biaya)
                     </span>
                     <span className="text-[11px] text-amber-700/90">
                       Cadangan kas pajak tahunan sebelum bagi hasil
@@ -1582,21 +1701,23 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
               <ShoppingBag className="w-3.5 h-3.5 text-[#00629b]" />
               Modal Kontribusi Teralokasi:
             </span>
-            <span className={unallocatedModal === 0 ? 'text-emerald-700' : 'text-amber-700'}>
+            <span className={totalUnallocatedModal === 0 && !hasOverAllocation ? 'text-emerald-700' : 'text-amber-700'}>
               Rp {formatRupiah(totalAllocatedCapital)} / Rp {formatRupiah(currentProjectData.totalModal)}
             </span>
           </div>
           <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
             <div
-              className="bg-[#00629b] h-full transition-all duration-300"
+              className={`h-full transition-all duration-300 ${hasOverAllocation ? 'bg-red-500' : 'bg-[#00629b]'}`}
               style={{ width: `${currentProjectData.totalModal > 0 ? Math.min(100, (totalAllocatedCapital / currentProjectData.totalModal) * 100) : 0}%` }}
             />
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-600">
-            <span>Item yang dikontribusikan anggota sebagai modal (harga beli × qty)</span>
-            {unallocatedModal > 0 ? (
+            <span>Item boleh dipilih beberapa anggota (dipisah per persentase)</span>
+            {hasOverAllocation ? (
+              <span className="font-bold text-red-600">Alokasi melebihi 100% pada beberapa item</span>
+            ) : totalUnallocatedModal > 0 ? (
               <span className="font-bold text-amber-700">
-                Modal Belum Teralokasi: Rp {formatRupiah(unallocatedModal)}
+                Modal Belum Teralokasi: Rp {formatRupiah(totalUnallocatedModal)}
               </span>
             ) : (
               <span className="font-bold text-emerald-700">Seluruh modal proyek telah teralokasi</span>
@@ -1676,14 +1797,23 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setCapitalPickerMemberId(member.id)}
+                        onClick={() => {
+                          setCapitalPickerMode(
+                            (member.capitalItems && member.capitalItems.length > 0) ? 'persenan' : 'manual'
+                          );
+                          setCapitalPickerMemberId(member.id);
+                        }}
                         className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#00629b] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                        title="Pilih barang proyek sebagai modal kontribusi anggota ini"
+                        title="Pilih barang proyek atau input manual sebagai modal kontribusi anggota ini"
                       >
                         <FolderOpen className="w-3 h-3" />
-                        {member.capitalItemIds && member.capitalItemIds.length > 0
-                          ? `Ubah Modal (${member.capitalItemIds.length} item)`
-                          : 'Pilih Modal'}
+                        {(member.capitalItems && member.capitalItems.length > 0)
+                          ? `Item (${member.capitalItems.length})`
+                          : (member.capitalItemIds && member.capitalItemIds.length > 0)
+                            ? `Item (${member.capitalItemIds.length})`
+                            : (member.capitalNominal && member.capitalNominal > 0)
+                              ? 'Manual'
+                              : 'Atur Modal'}
                       </button>
                     </td>
 
@@ -1758,22 +1888,78 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                     Pilih Modal Kontribusi
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Untuk <strong className="text-slate-800">{capitalPickerMember.name || 'Penerima'}</strong> — centang barang proyek yang dikontribusikan
+                    Untuk <strong className="text-slate-800">{capitalPickerMember.name || 'Penerima'}</strong> — pilih barang & atur persentase alokasi per item
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setCapitalPickerMemberId(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Mode Toggle */}
+                <div className="flex bg-slate-200/70 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchCapitalMode(capitalPickerMember.id, 'persenan')}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer ${
+                      capitalPickerMode === 'persenan'
+                        ? 'bg-[#00629b] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                  >
+                    Persenan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchCapitalMode(capitalPickerMember.id, 'manual')}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer ${
+                      capitalPickerMode === 'manual'
+                        ? 'bg-[#00629b] text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-800'
+                    }`}
+                  >
+                    Input Manual
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setCapitalPickerMemberId(null); setCapitalPickerMode('persenan'); }}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Modal Body: Item List */}
+            {/* Modal Body */}
             <div className="overflow-y-auto flex-1 p-5 space-y-2">
-              {sourceItems.length === 0 ? (
+              {capitalPickerMode === 'manual' ? (
+                /* ===== INPUT MANUAL MODE ===== */
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50/60 border border-blue-200/60 rounded-xl space-y-3">
+                    <p className="text-xs text-blue-800 font-bold">
+                      Input nominal modal kontribusi langsung
+                    </p>
+                    <p className="text-[11px] text-blue-600/80">
+                      Masukkan jumlah uang yang dikeluarkan oleh anggota ini tanpa perlu memilih item. Cocok untuk modal kas atau non-barang.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-600">Rp</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatRupiah(capitalPickerMember.capitalNominal || 0)}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          handleSetCapitalManualNominal(capitalPickerMember.id, Number(raw) || 0);
+                        }}
+                        className="flex-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00629b]/30 focus:border-[#00629b] tabular-nums"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Nominal akan digunakan sebagai dasar perhitungan "Total Diterima" di laporan.
+                    </div>
+                  </div>
+                </div>
+              ) : sourceItems.length === 0 ? (
                 <div className="p-8 text-center space-y-3">
                   <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-xs text-slate-500">
@@ -1813,37 +1999,83 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                   </div>
 
                   {sourceItems.map((item) => {
-                    const isChecked = (capitalPickerMember.capitalItemIds || []).includes(item.id);
+                    const memberItems = capitalPickerMember.capitalItems || [];
+                    const allocation = memberItems.find((ci) => ci.itemId === item.id);
+                    const isChecked = !!allocation;
+                    const memberPercent = allocation?.percentage || 0;
+                    const totalItemPercent = itemAllocations[item.id] || 0;
                     const subtotal = (item.buyPrice || 0) * (item.qty || 1);
+                    const isOverAllocated = totalItemPercent > 100;
                     return (
-                      <label
+                      <div
                         key={item.id}
-                        className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        className={`p-3 rounded-xl border transition-all ${
                           isChecked
-                            ? 'bg-blue-50/70 border-[#00629b]/50'
+                            ? isOverAllocated
+                              ? 'bg-red-50/70 border-red-300'
+                              : 'bg-blue-50/70 border-[#00629b]/50'
                             : 'bg-slate-50/60 border-slate-200/80 hover:border-slate-300'
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleToggleCapitalItem(capitalPickerMember.id, item.id)}
-                            className="w-4 h-4 accent-[#00629b] cursor-pointer shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-900 truncate">
-                              {item.name || 'Barang tanpa nama'}
-                            </div>
-                            <div className="text-[11px] text-slate-500">
-                              {item.qty || 1} × Rp {formatRupiah(item.buyPrice)} (Harga Beli)
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleCapitalItem(capitalPickerMember.id, item.id)}
+                              className="w-4 h-4 accent-[#00629b] cursor-pointer shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-slate-900 truncate">
+                                {item.name || 'Barang tanpa nama'}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                {item.qty || 1} × Rp {formatRupiah(item.buyPrice)} (Harga Beli) = Rp {formatRupiah(subtotal)}
+                              </div>
                             </div>
                           </div>
+
+                          {isChecked && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={memberPercent}
+                                onChange={(e) =>
+                                  handleUpdateCapitalItemPercent(
+                                    capitalPickerMember.id,
+                                    item.id,
+                                    Number(e.target.value)
+                                  )
+                                }
+                                className="w-16 text-center text-xs font-black bg-white border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00629b]/30 focus:border-[#00629b]"
+                              />
+                              <span className="text-xs font-bold text-slate-500">%</span>
+                            </div>
+                          )}
+
+                          <div className={`text-xs font-extrabold whitespace-nowrap ${isChecked ? 'text-[#00629b]' : 'text-slate-800'}`}>
+                            Rp {formatRupiah(isChecked ? subtotal * (memberPercent / 100) : subtotal)}
+                          </div>
                         </div>
-                        <div className="text-xs font-extrabold text-slate-800 whitespace-nowrap">
-                          Rp {formatRupiah(subtotal)}
-                        </div>
-                      </label>
+
+                        {/* Alokasi item di seluruh anggota */}
+                        {totalItemPercent > 0 && (
+                          <div className={`mt-2 flex items-center gap-2 text-[10px] px-7 ${isOverAllocated ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+                            <span>
+                              Dialokasikan total: <strong>{totalItemPercent}%</strong>
+                              {isOverAllocated && ' ⚠ Melebihi 100%'}
+                            </span>
+                            <span className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
+                              <span
+                                className={`h-full rounded-full ${isOverAllocated ? 'bg-red-400' : 'bg-[#00629b]'}`}
+                                style={{ width: `${Math.min(100, totalItemPercent)}%` }}
+                              />
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </>
@@ -1861,15 +2093,8 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setCapitalPickerMemberId(null)}
+                  onClick={() => { setCapitalPickerMemberId(null); setCapitalPickerMode('persenan'); }}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
-                >
-                  Tutup
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCapitalPickerMemberId(null)}
-                  className="px-5 py-2 bg-[#00629b] hover:bg-[#005180] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
                 >
                   Simpan Modal
                 </button>

@@ -1823,8 +1823,14 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                     </td>
 
                     {/* Total Diterima (Rp) */}
-                    <td className="py-3 px-3 text-right font-extrabold text-sm text-blue-900 bg-blue-50/40 whitespace-nowrap">
+                    <td className={`py-3 px-3 text-right font-extrabold text-sm whitespace-nowrap ${memberTotal < 0 ? 'text-red-600 bg-red-50/40' : 'text-blue-900 bg-blue-50/40'}`}>
                       Rp {formatRupiah(memberTotal)}
+                      {memberTotal < 0 && (
+                        <div className="text-[9px] font-bold text-red-500 mt-0.5">RUGI</div>
+                      )}
+                      {memberTotal >= 0 && memberCapital > 0 && memberTotal < memberCapital && (
+                        <div className="text-[9px] font-bold text-amber-600 mt-0.5">BALIK MODAL</div>
+                      )}
                     </td>
 
                     {/* Delete button */}

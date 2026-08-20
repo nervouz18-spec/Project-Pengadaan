@@ -16,6 +16,7 @@ import { AddRowModal } from './components/AddRowModal';
 import { SaveHistoryModal } from './components/SaveHistoryModal';
 import { FinancialReportView } from './components/FinancialReportView';
 import { HistoryView } from './components/HistoryView';
+import { PurchaseHistoryView } from './components/PurchaseHistoryView';
 import { SavedReportsArchiveView } from './components/SavedReportsArchiveView';
 import { Footer } from './components/Footer';
 import { AnimatePresence, motion } from 'motion/react';
@@ -343,13 +344,13 @@ export default function App() {
   }, [items]);
 
   // Save current calculation session to history (update if editing existing record)
-  const handleConfirmSaveToHistory = (title: string, notes?: string) => {
+  const handleConfirmSaveToHistory = (title: string, notes?: string, selectedDate?: string) => {
     if (items.length === 0) {
       showToast('Tidak ada barang untuk disimpan ke riwayat.');
       return;
     }
 
-    const timestamp = new Date().toLocaleString('id-ID', {
+    const timestamp = selectedDate || new Date().toLocaleString('id-ID', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -500,6 +501,7 @@ export default function App() {
             historyCount={histories.length}
             itemCount={items.length}
             savedReportsCount={savedReports.length}
+            purchaseHistoryProjectCount={new Set(histories.map((h) => h.title)).size}
             onNewProjectClick={handleOpenNewProjectSetup}
           />
         </div>
@@ -527,6 +529,7 @@ export default function App() {
                   historyCount={histories.length}
                   itemCount={items.length}
                   savedReportsCount={savedReports.length}
+                  purchaseHistoryProjectCount={new Set(histories.map((h) => h.title)).size}
                   onNewProjectClick={() => {
                     setIsMobileMenuOpen(false);
                     handleOpenNewProjectSetup();
@@ -666,6 +669,14 @@ export default function App() {
                   histories={histories}
                   onLoadHistory={handleLoadHistory}
                   onDeleteHistory={handleDeleteHistory}
+                  onBackToDashboard={() => setActiveTab('dashboard')}
+                />
+              )}
+
+              {/* TAB 4b: RIWAYAT BELANJA PER PROYEK */}
+              {activeTab === 'purchase-history' && (
+                <PurchaseHistoryView
+                  histories={histories}
                   onBackToDashboard={() => setActiveTab('dashboard')}
                 />
               )}

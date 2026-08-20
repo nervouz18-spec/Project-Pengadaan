@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutGrid, Calculator, History, TrendingUp, Sparkles, FolderPlus, FileSpreadsheet, BookmarkCheck } from 'lucide-react';
+import { LayoutGrid, Calculator, History, TrendingUp, Sparkles, FolderPlus, FileSpreadsheet, BookmarkCheck, ShoppingCart } from 'lucide-react';
 
-export type AppTab = 'dashboard' | 'calculator' | 'history' | 'financial-report' | 'saved-reports';
+export type AppTab = 'dashboard' | 'calculator' | 'history' | 'purchase-history' | 'financial-report' | 'saved-reports';
 
 interface SidebarProps {
   activeTab: AppTab;
@@ -9,6 +9,7 @@ interface SidebarProps {
   historyCount: number;
   itemCount: number;
   savedReportsCount?: number;
+  purchaseHistoryProjectCount?: number;
   onNewProjectClick?: () => void;
 }
 
@@ -18,6 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   historyCount,
   itemCount,
   savedReportsCount = 0,
+  purchaseHistoryProjectCount = 0,
   onNewProjectClick,
 }) => {
   return (
@@ -132,6 +134,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               {historyCount}
+            </span>
+          )}
+        </button>
+
+        {/* 3b. Riwayat Belanja per Proyek Tab */}
+        <button
+          type="button"
+          id="nav-purchase-history-tab"
+          onClick={() => onSelectTab('purchase-history')}
+          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+            activeTab === 'purchase-history'
+              ? 'bg-[#4eedaa] text-slate-950 font-bold shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <ShoppingCart
+              className={`w-4 h-4 ${
+                activeTab === 'purchase-history' ? 'text-slate-950' : 'text-slate-500'
+              }`}
+            />
+            <span>Riwayat Belanja</span>
+          </div>
+          {purchaseHistoryProjectCount > 0 && (
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                activeTab === 'purchase-history'
+                  ? 'bg-slate-950/15 text-slate-950'
+                  : 'bg-blue-100 text-[#00629b]'
+              }`}
+            >
+              {purchaseHistoryProjectCount}
             </span>
           )}
         </button>

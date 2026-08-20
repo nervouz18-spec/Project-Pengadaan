@@ -21,7 +21,6 @@ interface ProjectGroup {
   title: string;
   sessions: CalculationHistory[];
   items: Item[];
-  totalModal: number;
   totalHargaJual: number;
   sessionCount: number;
 }
@@ -42,14 +41,12 @@ export const PurchaseHistoryView: React.FC<PurchaseHistoryViewProps> = ({
           title: key,
           sessions: [],
           items: [],
-          totalModal: 0,
           totalHargaJual: 0,
           sessionCount: 0,
         };
       }
       groups[key].sessions.push(hist);
       groups[key].items.push(...hist.items);
-      groups[key].totalModal += hist.totalModal;
       groups[key].totalHargaJual += hist.totalHargaJual;
       groups[key].sessionCount += 1;
     });
@@ -216,9 +213,9 @@ export const PurchaseHistoryView: React.FC<PurchaseHistoryViewProps> = ({
                     </div>
                   </div>
                   <div className="text-right shrink-0 hidden sm:block">
-                    <div className="text-[11px] text-slate-500">Total Modal</div>
+                    <div className="text-[11px] text-slate-500">Total Harga Jual</div>
                     <div className="text-sm font-extrabold text-slate-800">
-                      Rp {formatRupiah(group.totalModal)}
+                      Rp {formatRupiah(group.totalHargaJual)}
                     </div>
                   </div>
                 </button>
@@ -241,10 +238,7 @@ export const PurchaseHistoryView: React.FC<PurchaseHistoryViewProps> = ({
                               {item.name || 'Barang tanpa nama'}
                             </div>
                             <div className="text-[11px] text-slate-500">
-                              {item.qty || 1} × Rp {formatRupiah(item.buyPrice)} (Beli)
-                              {item.sellPrice > 0 && (
-                                <> → Rp {formatRupiah(item.sellPrice)} (Jual)</>
-                              )}
+                              Harga Satuan: Rp {formatRupiah(item.buyPrice)} · Qty: {item.qty || 1}
                             </div>
                           </div>
                           <div className="text-right shrink-0">

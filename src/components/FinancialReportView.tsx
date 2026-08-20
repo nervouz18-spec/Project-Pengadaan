@@ -433,7 +433,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
         if (m.id !== id) return m;
         return {
           ...m,
-          [field]: field === 'percentage' ? Math.max(0, parseFloat(value) || 0) : value,
+          [field]: field === 'percentage' ? (parseFloat(value) || 0) : value,
         };
       })
     );

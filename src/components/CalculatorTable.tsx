@@ -78,7 +78,7 @@ export const CalculatorTable: React.FC<CalculatorTableProps> = ({
   };
 
   const handleQtyChange = (item: Item, valueStr: string) => {
-    const qtyVal = Math.max(1, parseInt(valueStr, 10) || 1);
+    const qtyVal = Math.max(0, parseInt(valueStr, 10) || 0);
     onUpdateItem({
       ...item,
       qty: qtyVal,
@@ -351,7 +351,7 @@ export const CalculatorTable: React.FC<CalculatorTableProps> = ({
                 {/* Budget Belanja */}
                 <th className="py-3 px-3 min-w-[180px]">Nama Barang</th>
                 <th className="py-3 px-2 text-right min-w-[105px]">Harga Beli</th>
-                <th className="py-3 px-1.5 text-center min-w-[50px]">Qty</th>
+                        <th className="py-3 px-1.5 text-center min-w-[60px]">Qty</th>
                 <th className="py-3 px-2 text-right min-w-[110px] border-r border-slate-200 text-slate-900">
                   Total Modal
                 </th>
@@ -518,11 +518,11 @@ export const CalculatorTable: React.FC<CalculatorTableProps> = ({
                       >
                         <input
                           type="number"
-                          min="1"
-                          max="9999"
+                          min="0"
+                          max="99999"
                           value={item.qty}
                           onChange={(e) => handleQtyChange(item, e.target.value)}
-                          className="w-11 px-1 py-1 text-center font-semibold text-slate-900 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#00629b] shadow-2xs"
+                          className="w-16 px-2 py-1 text-center font-semibold text-slate-900 bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#00629b] shadow-2xs"
                         />
                       </td>
 

@@ -33,7 +33,7 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
     name: name || 'Preview',
     buyPrice: buyPriceNum,
     sellPrice: sellPriceNum,
-    qty: Math.max(1, qty),
+      qty: qty,
     cashbackPercent,
     commissionPercent,
   });
@@ -48,7 +48,7 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
       category: category || 'Umum',
       buyPrice: buyPriceNum,
       sellPrice: sellPriceNum,
-      qty: Math.max(1, qty),
+    qty: qty,
       cashbackPercent: cashbackPercent,
       commissionPercent: commissionPercent,
     };
@@ -137,10 +137,10 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
               </label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 required
                 value={qty}
-                onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                onChange={(e) => setQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#00629b]"
               />
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Item, GlobalSettings, CalculationHistory, UserProfile, ProjectMeta, SavedFinancialReport } from './types';
 import { initialItems, initialGlobalSettings, initialHistories } from './data/initialData';
 import { computeItemMetrics, exportToCSV, formatRupiah } from './utils/formatters';
@@ -33,8 +33,11 @@ export default function App() {
     const saved = localStorage.getItem('proyeksi_laba_user');
     if (saved) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.name === 'string' && typeof parsed.email === 'string') {
+          return parsed;
+        }
+      } catch {
         // fallback
       }
     }
@@ -54,8 +57,11 @@ export default function App() {
     const saved = localStorage.getItem('proyeksi_laba_current_project');
     if (saved) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.name === 'string') {
+          return parsed;
+        }
+      } catch {
         // fallback
       }
     }
@@ -90,8 +96,11 @@ export default function App() {
     const saved = localStorage.getItem('proyeksi_laba_settings');
     if (saved) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.defaultCashback === 'number') {
+          return parsed;
+        }
+      } catch {
         // fallback
       }
     }
@@ -105,7 +114,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
+      } catch {
         // fallback
       }
     }
@@ -119,7 +128,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
+      } catch {
         // fallback
       }
     }
@@ -140,45 +149,50 @@ export default function App() {
 
   // Toast Notification State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   // Mobile sidebar state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Persist current project
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_current_project', JSON.stringify(currentProject));
+    try { localStorage.setItem('proyeksi_laba_current_project', JSON.stringify(currentProject)); } catch { /* quota exceeded */ }
   }, [currentProject]);
 
   // Persist items
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_items', JSON.stringify(items));
+    try { localStorage.setItem('proyeksi_laba_items', JSON.stringify(items)); } catch { /* quota exceeded */ }
   }, [items]);
 
   // Persist settings
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_settings', JSON.stringify(globalSettings));
+    try { localStorage.setItem('proyeksi_laba_settings', JSON.stringify(globalSettings)); } catch { /* quota exceeded */ }
   }, [globalSettings]);
 
   // Persist histories
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_histories', JSON.stringify(histories));
+    try { localStorage.setItem('proyeksi_laba_histories', JSON.stringify(histories)); } catch { /* quota exceeded */ }
   }, [histories]);
 
   // Persist saved reports
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_saved_reports', JSON.stringify(savedReports));
+    try { localStorage.setItem('proyeksi_laba_saved_reports', JSON.stringify(savedReports)); } catch { /* quota exceeded */ }
   }, [savedReports]);
 
   // Persist Auth
   useEffect(() => {
-    localStorage.setItem('proyeksi_laba_auth', isAuthenticated ? 'true' : 'false');
-    localStorage.setItem('proyeksi_laba_user', JSON.stringify(userProfile));
+    try {
+      localStorage.setItem('proyeksi_laba_auth', isAuthenticated ? 'true' : 'false');
+      localStorage.setItem('proyeksi_laba_user', JSON.stringify(userProfile));
+    } catch { /* quota exceeded */ }
   }, [isAuthenticated, userProfile]);
 
   const showToast = (msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 3000);
   };
 
@@ -248,15 +262,13 @@ export default function App() {
   // Add a quick blank row
   const handleAddQuickRow = () => {
     const newItem: Item = {
-      id: `item-${Date.now()}`,
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: '',
       buyPrice: 0,
       qty: 1,
       sellPrice: 0,
       cashbackPercent: globalSettings.defaultCashback ?? 10,
-      cashbackChoice: globalSettings.defaultCashback ?? 10,
       commissionPercent: globalSettings.defaultCommission ?? 3,
-      useCommission: (globalSettings.defaultCommission ?? 3) > 0,
       category: 'Umum',
     };
     setItems((prev) => [...prev, newItem]);
@@ -278,7 +290,6 @@ export default function App() {
       prev.map((item) => ({
         ...item,
         cashbackPercent: safePercent,
-        cashbackChoice: safePercent,
       }))
     );
   };
@@ -290,7 +301,6 @@ export default function App() {
       prev.map((item) => ({
         ...item,
         commissionPercent: safePercent,
-        useCommission: safePercent > 0,
       }))
     );
   };
@@ -299,6 +309,12 @@ export default function App() {
   const selectedItem = useMemo(() => {
     return items.find((i) => i.id === selectedItemId) || null;
   }, [items, selectedItemId]);
+
+  // Unique project count for sidebar badge
+  const uniqueProjectCount = useMemo(
+    () => new Set(histories.map((h) => h.title)).size,
+    [histories]
+  );
 
   // Riwayat yang sedang dimuat/diedit di kalkulator
   const editingHistory = useMemo(() => {
@@ -387,7 +403,7 @@ export default function App() {
     }
 
     const newHist: CalculationHistory = {
-      id: `hist-${Date.now()}`,
+      id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       title: title || currentProject.name,
       description: currentProject.description,
       notes: notes,
@@ -501,7 +517,7 @@ export default function App() {
             historyCount={histories.length}
             itemCount={items.length}
             savedReportsCount={savedReports.length}
-            purchaseHistoryProjectCount={new Set(histories.map((h) => h.title)).size}
+            purchaseHistoryProjectCount={uniqueProjectCount}
             onNewProjectClick={handleOpenNewProjectSetup}
           />
         </div>
@@ -529,7 +545,7 @@ export default function App() {
                   historyCount={histories.length}
                   itemCount={items.length}
                   savedReportsCount={savedReports.length}
-                  purchaseHistoryProjectCount={new Set(histories.map((h) => h.title)).size}
+                  purchaseHistoryProjectCount={uniqueProjectCount}
                   onNewProjectClick={() => {
                     setIsMobileMenuOpen(false);
                     handleOpenNewProjectSetup();

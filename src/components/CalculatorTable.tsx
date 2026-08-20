@@ -106,7 +106,6 @@ export const CalculatorTable: React.FC<CalculatorTableProps> = ({
     onUpdateItem({
       ...item,
       cashbackPercent: safeVal,
-      cashbackChoice: safeVal,
     });
   };
 
@@ -115,7 +114,6 @@ export const CalculatorTable: React.FC<CalculatorTableProps> = ({
     onUpdateItem({
       ...item,
       commissionPercent: safeVal,
-      useCommission: safeVal > 0,
     });
   };
 

@@ -44,7 +44,6 @@ export const GlobalSettingsCard: React.FC<GlobalSettingsCardProps> = ({
     onUpdateSettings({ 
       ...settings, 
       defaultCommission: val,
-      defaultUseCommission: val > 0 
     });
     triggerToast(val === 0 ? 'Komisi dinonaktifkan (0%) untuk semua barang!' : `Komisi ${val}% diterapkan ke semua barang!`);
   };
@@ -55,7 +54,6 @@ export const GlobalSettingsCard: React.FC<GlobalSettingsCardProps> = ({
     onUpdateSettings({ 
       ...settings, 
       defaultCommission: safeVal,
-      defaultUseCommission: safeVal > 0 
     });
     triggerToast(`Komisi ${safeVal}% diterapkan ke semua barang!`);
   };
@@ -140,14 +138,14 @@ export const GlobalSettingsCard: React.FC<GlobalSettingsCardProps> = ({
             Komisi Massal (0% – 10%)
           </label>
           <span className="text-[11px] font-bold text-slate-900">
-            Saat ini: {settings.defaultCommission ?? (settings.defaultUseCommission ? 3 : 0)}%
+            Saat ini: {settings.defaultCommission ?? 0}%
           </span>
         </div>
 
         {/* Quick Presets */}
         <div className="grid grid-cols-6 gap-1 mb-2">
           {[0, 1, 2, 3, 5, 10].map((percent) => {
-            const isCurrent = (settings.defaultCommission === percent) || (!settings.defaultCommission && percent === 0 && !settings.defaultUseCommission);
+            const isCurrent = settings.defaultCommission === percent;
             return (
               <button
                 key={percent}

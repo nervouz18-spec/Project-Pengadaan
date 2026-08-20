@@ -165,7 +165,7 @@ export const DetailTerpilihCard: React.FC<DetailTerpilihCardProps> = ({
                 value={metrics.cashbackPercent}
                 onChange={(e) => {
                   const val = Math.min(20, Math.max(0, parseInt(e.target.value, 10) || 0));
-                  onUpdateItem({ ...selectedItem, cashbackPercent: val, cashbackChoice: val });
+                  onUpdateItem({ ...selectedItem, cashbackPercent: val });
                 }}
                 className="w-12 px-1 py-0.5 text-center text-xs font-bold bg-white border border-slate-300 rounded"
               />
@@ -177,7 +177,7 @@ export const DetailTerpilihCard: React.FC<DetailTerpilihCardProps> = ({
               <button
                 key={cbVal}
                 type="button"
-                onClick={() => onUpdateItem({ ...selectedItem, cashbackPercent: cbVal, cashbackChoice: cbVal })}
+                onClick={() => onUpdateItem({ ...selectedItem, cashbackPercent: cbVal })}
                 className={`flex-1 py-0.5 text-[11px] font-bold rounded cursor-pointer ${
                   metrics.cashbackPercent === cbVal
                     ? 'bg-[#00629b] text-white shadow-2xs'
@@ -209,7 +209,7 @@ export const DetailTerpilihCard: React.FC<DetailTerpilihCardProps> = ({
                 value={metrics.commissionPercent}
                 onChange={(e) => {
                   const val = Math.min(10, Math.max(0, parseInt(e.target.value, 10) || 0));
-                  onUpdateItem({ ...selectedItem, commissionPercent: val, useCommission: val > 0 });
+                  onUpdateItem({ ...selectedItem, commissionPercent: val });
                 }}
                 className="w-12 px-1 py-0.5 text-center text-xs font-bold bg-white border border-slate-300 rounded"
               />
@@ -221,7 +221,7 @@ export const DetailTerpilihCard: React.FC<DetailTerpilihCardProps> = ({
               <button
                 key={commVal}
                 type="button"
-                onClick={() => onUpdateItem({ ...selectedItem, commissionPercent: commVal, useCommission: commVal > 0 })}
+                onClick={() => onUpdateItem({ ...selectedItem, commissionPercent: commVal })}
                 className={`flex-1 py-0.5 text-[11px] font-bold rounded cursor-pointer ${
                   metrics.commissionPercent === commVal
                     ? 'bg-slate-900 text-white shadow-2xs'

@@ -36,7 +36,6 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
     qty: Math.max(1, qty),
     cashbackPercent,
     commissionPercent,
-    useCommission: commissionPercent > 0,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,16 +43,14 @@ export const AddRowModal: React.FC<AddRowModalProps> = ({
     if (!name.trim()) return;
 
     const newItem: Item = {
-      id: `item-${Date.now()}`,
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: name.trim(),
       category: category || 'Umum',
       buyPrice: buyPriceNum,
       sellPrice: sellPriceNum,
       qty: Math.max(1, qty),
       cashbackPercent: cashbackPercent,
-      cashbackChoice: cashbackPercent,
       commissionPercent: commissionPercent,
-      useCommission: commissionPercent > 0,
     };
 
     onAddItem(newItem);

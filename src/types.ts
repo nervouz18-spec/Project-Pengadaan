@@ -4,9 +4,7 @@ export interface Item {
   buyPrice: number; // Harga Beli
   qty: number; // Qty
   sellPrice: number; // Harga Jual (inputan sendiri)
-  cashbackChoice?: number; // Nilai Cashback % (0 - 20%)
   cashbackPercent?: number; // Nilai Cashback % (0 - 20%)
-  useCommission?: boolean; // Status Komisi aktif/tidak
   commissionPercent?: number; // Nilai Komisi % (0 - 10%)
   category?: string;
   notes?: string;
@@ -49,7 +47,6 @@ export interface ComputedMetrics {
 export interface GlobalSettings {
   defaultCashback: number; // 0 - 20%
   defaultCommission: number; // 0 - 10%
-  defaultUseCommission: boolean;
 }
 
 export interface CalculationHistory {

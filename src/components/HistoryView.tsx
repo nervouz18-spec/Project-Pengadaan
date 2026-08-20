@@ -31,7 +31,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   onBackToDashboard,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHistId, setSelectedHistId] = useState<string | null>(null);
   const [previewHist, setPreviewHist] = useState<CalculationHistory | null>(null);
 
   // Filter histories based on search query

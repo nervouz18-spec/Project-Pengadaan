@@ -63,8 +63,6 @@ export const computeItemMetrics = (item: Item): ComputedMetrics => {
   let cbPercent = 10;
   if (typeof item.cashbackPercent === 'number') {
     cbPercent = Math.min(20, Math.max(0, item.cashbackPercent));
-  } else if (typeof item.cashbackChoice === 'number') {
-    cbPercent = Math.min(20, Math.max(0, item.cashbackChoice));
   }
 
   const basisCashback = Math.max(0, totalHargaJual - totalPph - totalPajak);
@@ -74,8 +72,6 @@ export const computeItemMetrics = (item: Item): ComputedMetrics => {
   let commPercent = 0;
   if (typeof item.commissionPercent === 'number') {
     commPercent = Math.min(10, Math.max(0, item.commissionPercent));
-  } else if (item.useCommission !== undefined) {
-    commPercent = item.useCommission ? 3 : 0;
   }
 
   const komisiNominal = totalHargaJual * (commPercent / 100);

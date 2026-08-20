@@ -222,7 +222,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
 
     const hist = histories.find((h) => h.id === selectedSourceId);
     if (hist) {
-      const commItems = hist.items ? hist.items.filter(i => (i.commissionPercent || 0) > 0 || i.useCommission).length : 0;
+      const commItems = hist.items ? hist.items.filter(i => (i.commissionPercent || 0) > 0).length : 0;
       return {
         id: hist.id,
         isSaved: true,

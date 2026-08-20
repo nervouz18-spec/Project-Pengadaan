@@ -224,13 +224,13 @@ export const SavedReportsArchiveView: React.FC<SavedReportsArchiveViewProps> = (
     const commissionPercent = Math.min(10, Math.max(0, Number(editDraft.commissionPercent) || 0));
     const cashbackNominal = Math.round(uangMasuk * (cashbackPercent / 100));
     const komisiNominal = Math.round(uangMasuk * (commissionPercent / 100));
-    const labaProject = Math.max(0, uangMasuk - totalModal - cashbackNominal - komisiNominal);
+    const labaProject = uangMasuk - totalModal - cashbackNominal - komisiNominal;
     const biayaMaterai = Math.max(0, Number(editDraft.biayaMaterai) || 0);
     const biayaOperasional = Math.max(0, Number(editDraft.biayaOperasional) || 0);
-    const labaSetelahBiaya = Math.max(0, labaProject - biayaMaterai - biayaOperasional);
+    const labaSetelahBiaya = labaProject - biayaMaterai - biayaOperasional;
     const tabunganPajakPercent = Math.min(100, Math.max(0, Number(editDraft.tabunganPajakPercent) || 0));
-    const tabunganPajakNominal = Math.round(labaSetelahBiaya * (tabunganPajakPercent / 100));
-    const labaBersihAkhir = Math.max(0, labaSetelahBiaya - tabunganPajakNominal);
+    const tabunganPajakNominal = Math.round(labaSetelahBiaya > 0 ? labaSetelahBiaya * (tabunganPajakPercent / 100) : 0);
+    const labaBersihAkhir = labaSetelahBiaya - tabunganPajakNominal;
     const totalPercent = editDraft.members.reduce((s, m) => s + (Number(m.percentage) || 0), 0);
     return {
       cashbackNominal,

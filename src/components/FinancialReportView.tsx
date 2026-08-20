@@ -285,10 +285,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
 
   // Laba Proyek = Uang Masuk Manual - Total Modal - Cashback Manual - Komisi Manual
   // (Pajak & PPh tidak dikurangkan pada laporan bagi hasil)
-  const labaProject = Math.max(
-    0,
-    effectiveUangMasuk - totalModalProject - cashbackReportNominal - komisiReportNominal
-  );
+  const labaProject = effectiveUangMasuk - totalModalProject - cashbackReportNominal - komisiReportNominal;
 
   // Manual costs computation
   const biayaMateraiNum = parseNumberFromInput(biayaMateraiStr);
@@ -302,10 +299,11 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
 
   // Laba Setelah Biaya = Laba Proyek - Materai - Operasional
   // Tabungan pajak diambil dari laba setelah biaya, bukan dari laba proyek
-  const labaSetelahBiaya = Math.max(0, labaProject - biayaMateraiNum - biayaOperasionalNum);
+  const labaSetelahBiaya = labaProject - biayaMateraiNum - biayaOperasionalNum;
 
   // Tabungan Pajak computation (dari laba setelah biaya materai & operasional, atau nominal manual)
   const tabunganPajakNum = useMemo(() => {
+    if (labaSetelahBiaya <= 0) return 0;
     if (tabunganPajakMode === 'percent') {
       return Math.round((labaSetelahBiaya * (tabunganPajakPercent / 100)));
     }
@@ -321,10 +319,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
   }, [tabunganPajakMode, tabunganPajakPercent, tabunganPajakNum, labaSetelahBiaya]);
 
   // Laba Bersih Akhir = Laba Setelah Biaya - Tabungan Pajak
-  const labaBersihAkhir = Math.max(
-    0, 
-    labaSetelahBiaya - tabunganPajakNum
-  );
+  const labaBersihAkhir = labaSetelahBiaya - tabunganPajakNum;
 
   // ===== Pembagian Modal (Kontribusi Item per Anggota) =====
   const sourceItems = currentProjectData.items;
@@ -1493,7 +1488,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                 <span className="text-slate-800">
                   = Laba Proyek (Sebelum Biaya Operasional):
                 </span>
-                <span className="font-black text-slate-900 text-sm">
+                <span className={`font-black text-sm ${labaProject < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                   Rp {formatRupiah(labaProject)}
                 </span>
               </div>
@@ -1533,7 +1528,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
                 <span className="text-slate-800">
                   = Laba Setelah Biaya Materai & Operasional:
                 </span>
-                <span className="font-black text-slate-900 text-sm">
+                <span className={`font-black text-sm ${labaSetelahBiaya < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                   Rp {formatRupiah(labaSetelahBiaya)}
                 </span>
               </div>
@@ -1556,16 +1551,16 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({
               )}
 
               {/* 8. Total Laba Bersih Final */}
-              <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-2xl mt-3">
+              <div className={`flex items-center justify-between p-4 border rounded-2xl mt-3 ${labaBersihAkhir < 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                 <div>
-                  <span className="text-xs font-extrabold text-emerald-950 uppercase tracking-wide block">
+                  <span className={`text-xs font-extrabold uppercase tracking-wide block ${labaBersihAkhir < 0 ? 'text-red-950' : 'text-emerald-950'}`}>
                     = LABA BERSIH AKHIR (SIAP DIBAGIKAN)
                   </span>
-                  <span className="text-[11px] text-emerald-800 font-medium">
-                    Total dana bersih siap didistribusikan ke penerima
+                  <span className={`text-[11px] font-medium ${labaBersihAkhir < 0 ? 'text-red-800' : 'text-emerald-800'}`}>
+                    {labaBersihAkhir < 0 ? 'RUGI — total kerugian siap dibebankan ke penerima' : 'Total dana bersih siap didistribusikan ke penerima'}
                   </span>
                 </div>
-                <span className="text-xl sm:text-2xl font-black text-emerald-800">
+                <span className={`text-xl sm:text-2xl font-black ${labaBersihAkhir < 0 ? 'text-red-600' : 'text-emerald-800'}`}>
                   Rp {formatRupiah(labaBersihAkhir)}
                 </span>
               </div>
